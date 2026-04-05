@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulateur ROI</title>
+<meta name="description" content="Simulateur de retour sur investissement avec intérêts composés, taux et montants variables dans le temps.">
+<meta name="theme-color" content="#0b0d11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ROI Calc">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0d11;
+    --surface: #12151c;
+    --surface2: #1a1f2b;
+    --border: #252b3a;
+    --accent: #e8c97e;
+    --accent2: #5fb3a8;
+    --accent3: #c47bbd;
+    --text: #d4d8e4;
+    --muted: #606880;
+    --danger: #e07070;
+    --green: #6dcf9e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  /* ────────── TABS ────────── */
+  .tab-bar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    padding: 0 24px;
+  }
+
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 16px 20px 14px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: -1px;
+    white-space: nowrap;
+  }
+
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-icon { font-size: 14px; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ────────── LAYOUT ────────── */
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 36px 24px 80px;
+  }
+
+  header {
+    margin-bottom: 36px;
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .header-text h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 38px;
+    font-weight: 300;
+    color: #fff;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+
+  .header-text h1 em { font-style: italic; color: var(--accent); }
+
+  .header-text p {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+  }
+
+  .header-badge {
+    margin-left: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .header-badge label {
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .years-input {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 600;
+    width: 60px;
+    text-align: center;
+    outline: none;
+    caret-color: var(--accent);
+  }
+
+  .years-controls { display: flex; flex-direction: column; gap: 2px; }
+
+  .years-controls button {
+    background: var(--border);
+    border: none;
+    color: var(--text);
+    width: 18px;
+    height: 14px;
+    cursor: pointer;
+    border-radius: 2px;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+  }
+
+  .years-controls button:hover { background: var(--accent); color: var(--bg); }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 700px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .header-text h1 { font-size: 28px; }
+    .header-badge { margin-left: 0; }
+    .ref-grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+  }
+
+  .panel-title span {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  .dot-amount { background: var(--accent); }
+  .dot-rate   { background: var(--accent2); }
+
+  .btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .chart-zone {
+    position: relative;
+    height: 180px;
+    cursor: crosshair;
+    user-select: none;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+
+  .chart-zone canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .chart-hint {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 12px;
+  }
+
+  .points-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+  .points-table th {
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 400;
+    padding: 4px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .points-table td {
+    padding: 4px 4px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  .points-table tr:last-child td { border-bottom: none; }
+
+  .points-table input {
+    background: var(--surface);
+    border: 1px solid transparent;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 4px 8px;
+    width: 100%;
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .points-table input:focus { border-color: var(--accent); }
+
+  .del-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.15s;
+    line-height: 1;
+  }
+
+  .del-btn:hover { color: var(--danger); }
+
+  /* Results */
+  .results-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .results-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+
+  .results-header h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 300;
+    color: #fff;
+  }
+
+  .summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+
+  .card-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 6px; }
+
+  .card-value { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
+  .card-value.gold   { color: var(--accent); }
+  .card-value.teal   { color: var(--accent2); }
+  .card-value.purple { color: var(--accent3); }
+  .card-value.green  { color: var(--green); }
+
+  .card-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .result-chart-wrap { position: relative; height: 280px; }
+
+  .annual-table-wrap {
+    max-height: 300px;
+    overflow-y: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-top: 20px;
+  }
+
+  .annual-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+  .annual-table th {
+    position: sticky;
+    top: 0;
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 400;
+    padding: 8px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    z-index: 1;
+  }
+
+  .annual-table th:first-child { text-align: left; }
+
+  .annual-table td {
+    padding: 7px 12px;
+    text-align: right;
+    border-bottom: 1px solid rgba(37,43,58,0.5);
+    color: var(--text);
+    transition: background 0.1s;
+  }
+
+  .annual-table td:first-child { text-align: left; color: var(--muted); }
+  .annual-table tr:hover td { background: rgba(232,201,126,0.04); }
+  .annual-table .gain  { color: var(--green); }
+  .annual-table .total { color: var(--accent); font-weight: 500; }
+
+  /* ────────── REFERENCE TAB ────────── */
+  .ref-header { margin-bottom: 28px; }
+
+  .ref-header h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 32px;
+    font-weight: 300;
+    color: #fff;
+    letter-spacing: -0.5px;
+  }
+
+  .ref-header p { color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+  .ref-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+  }
+
+  .ref-controls label {
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-right: 4px;
+  }
+
+  .ref-select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 6px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .ref-select:focus { border-color: var(--accent); }
+
+  .ref-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .ref-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .ref-panel-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+
+  .ref-panel-desc {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    line-height: 1.65;
+  }
+
+  .ref-chart-wrap { position: relative; height: 240px; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface2); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  .tooltip-custom {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+    color: var(--text);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+</style>
+</head>
+<body>
+
+<!-- TAB BAR -->
+<nav class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('sim', this)">
+    <span class="tab-icon">⚙︎</span> Simulation
+  </button>
+  <button class="tab-btn" onclick="switchTab('ref', this)">
+    <span class="tab-icon">◎</span> Références
+  </button>
+</nav>
+
+<!-- ══════════════════════════ TAB: SIMULATION ══════════════════════════ -->
+<div id="tab-sim" class="tab-content active">
+<div class="container">
+
+  <header>
+    <div class="header-text">
+      <h1>Simulateur <em>ROI</em></h1>
+      <p>Investissement mensuel — projection &amp; rendement composé</p>
+    </div>
+    <div class="header-badge">
+      <label>Durée (années)</label>
+      <input type="number" class="years-input" id="yearsInput" min="1" max="50" value="10">
+      <div class="years-controls">
+        <button onclick="adjustYears(1)">▲</button>
+        <button onclick="adjustYears(-1)">▼</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid-2">
+    <!-- Amount -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot-amount"></span>Montant mensuel (€)</div>
+        <button class="btn" onclick="addPoint('amount')">+ Ajouter point</button>
+      </div>
+      <div class="chart-zone" id="amountChartZone">
+        <canvas id="amountCanvas"></canvas>
+      </div>
+      <p class="chart-hint">Cliquez pour ajouter · Glissez pour déplacer</p>
+      <table class="points-table" id="amountTable">
+        <thead><tr><th>Année</th><th>Montant / mois (€)</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Rate -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="dot-rate"></span>Taux annuel (%)</div>
+        <button class="btn" onclick="addPoint('rate')">+ Ajouter point</button>
+      </div>
+      <div class="chart-zone" id="rateChartZone">
+        <canvas id="rateCanvas"></canvas>
+      </div>
+      <p class="chart-hint">Cliquez pour ajouter · Glissez pour déplacer</p>
+      <table class="points-table" id="rateTable">
+        <thead><tr><th>Année</th><th>Taux annuel (%)</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-panel">
+    <div class="results-header">
+      <h2>Résultats de la projection</h2>
+    </div>
+
+    <div class="summary-cards">
+      <div class="card">
+        <div class="card-label">Capital investi</div>
+        <div class="card-value gold" id="sumInvested">—</div>
+        <div class="card-sub">versements cumulés</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Gains générés</div>
+        <div class="card-value green" id="sumGains">—</div>
+        <div class="card-sub">intérêts composés</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Valeur totale</div>
+        <div class="card-value teal" id="sumTotal">—</div>
+        <div class="card-sub">à l'échéance</div>
+      </div>
+      <div class="card">
+        <div class="card-label">ROI global</div>
+        <div class="card-value purple" id="sumROI">—</div>
+        <div class="card-sub">rendement total</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Taux moy. pondéré</div>
+        <div class="card-value gold" id="sumRate">—</div>
+        <div class="card-sub">sur la période</div>
+      </div>
+    </div>
+
+    <div class="result-chart-wrap">
+      <canvas id="resultCanvas"></canvas>
+    </div>
+
+    <div class="annual-table-wrap">
+      <table class="annual-table">
+        <thead>
+          <tr>
+            <th>Année</th>
+            <th>Versements</th>
+            <th>Taux moy.</th>
+            <th>Investi cumulé</th>
+            <th>Gains annuels</th>
+            <th>Gains cumulés</th>
+            <th>Valeur portefeuille</th>
+          </tr>
+        </thead>
+        <tbody id="annualBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════════════ TAB: REFERENCES ══════════════════════════ -->
+<div id="tab-ref" class="tab-content">
+<div class="container">
+
+  <div class="ref-header">
+    <h2>Graphiques de <em style="font-style:italic;color:var(--accent2)">référence</em></h2>
+    <p>Visualisations générales des intérêts composés — indépendantes de votre simulation</p>
+  </div>
+
+  <div class="ref-controls">
+    <div>
+      <label>Durée</label>
+      <select class="ref-select" id="refYears" onchange="drawAllRefCharts()">
+        <option value="5">5 ans</option>
+        <option value="10" selected>10 ans</option>
+        <option value="15">15 ans</option>
+        <option value="20">20 ans</option>
+        <option value="25">25 ans</option>
+        <option value="30">30 ans</option>
+      </select>
+    </div>
+    <div>
+      <label>Versement max</label>
+      <select class="ref-select" id="refMaxAmount" onchange="drawAllRefCharts()">
+        <option value="500">500 €/mois</option>
+        <option value="1000">1 000 €/mois</option>
+        <option value="2000" selected>2 000 €/mois</option>
+        <option value="5000">5 000 €/mois</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="ref-grid">
+
+    <div class="ref-panel">
+      <div class="ref-panel-title">ROI final vs. taux annuel</div>
+      <div class="ref-panel-desc">
+        Rendement total (%) obtenu sur la période choisie, pour 500 €/mois versés à taux fixe. Illustre la non-linéarité de l'effet des intérêts composés.
+      </div>
+      <div class="ref-chart-wrap"><canvas id="refChart1"></canvas></div>
+    </div>
+
+    <div class="ref-panel">
+      <div class="ref-panel-title">Valeur finale vs. durée d'investissement</div>
+      <div class="ref-panel-desc">
+        Valeur du portefeuille à l'échéance selon la durée (1–30 ans), pour 500 €/mois à différents taux. Montre l'accélération exponentielle en fin de période.
+      </div>
+      <div class="ref-chart-wrap"><canvas id="refChart2"></canvas></div>
+    </div>
+
+    <div class="ref-panel">
+      <div class="ref-panel-title">Gains cumulés vs. versement mensuel</div>
+      <div class="ref-panel-desc">
+        Intérêts totaux générés sur la période selon le montant versé chaque mois, à différents taux. La pente s'accentue avec le taux.
+      </div>
+      <div class="ref-chart-wrap"><canvas id="refChart3"></canvas></div>
+    </div>
+
+    <div class="ref-panel">
+      <div class="ref-panel-title">Gains de la dernière année vs. versement mensuel</div>
+      <div class="ref-panel-desc">
+        Intérêts générés uniquement sur la dernière année de la période. Illustre l'effet boule de neige : à taux élevé et longue durée, la dernière année rapporte autant que les premières années entières.
+      </div>
+      <div class="ref-chart-wrap"><canvas id="refChart4"></canvas></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// TAB SYSTEM
+// ═══════════════════════════════════════════════════
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'ref') setTimeout(drawAllRefCharts, 60);
+}
+
+// ═══════════════════════════════════════════════════
+// SHARED UTILS
+// ═══════════════════════════════════════════════════
+const state = {
+  years: 10,
+  amountPoints: [{ x: 0, y: 500 }],
+  ratePoints:   [{ x: 0, y: 6 }],
+};
+
+let resultChart = null;
+
+function fmt(n) {
+  return new Intl.NumberFormat('fr-FR', { minimumFractionDigits:0, maximumFractionDigits:0 }).format(n) + ' €';
+}
+
+function fmtK(n) {
+  const abs = Math.abs(n);
+  if (abs >= 1e6) return (n/1e6).toFixed(2) + ' M€';
+  if (abs >= 1e3) return (n/1e3).toFixed(1) + ' k€';
+  return Math.round(n) + ' €';
+}
+
+function fmtPct(n) { return n.toFixed(2) + ' %'; }
+
+function lerp(points, x) {
+  const s = [...points].sort((a,b) => a.x - b.x);
+  if (x <= s[0].x) return s[0].y;
+  if (x >= s[s.length-1].x) return s[s.length-1].y;
+  for (let i = 0; i < s.length-1; i++) {
+    if (x >= s[i].x && x <= s[i+1].x) {
+      const t = (x-s[i].x)/(s[i+1].x-s[i].x);
+      return s[i].y + t*(s[i+1].y-s[i].y);
+    }
+  }
+  return s[s.length-1].y;
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// Fixed-rate/amount simulation (for reference charts)
+function simulateFixed(monthlyAmount, annualRatePct, years) {
+  const n = years * 12;
+  const r = Math.pow(1 + annualRatePct/100, 1/12) - 1;
+  let port = 0, invested = 0;
+  for (let m = 0; m < n; m++) {
+    port = (port + monthlyAmount) * (1 + r);
+    invested += monthlyAmount;
+  }
+  // Portfolio after (years-1) months for last-year gains
+  let portPrev = 0;
+  const nPrev = Math.max(0, (years-1)*12);
+  for (let m = 0; m < nPrev; m++) portPrev = (portPrev + monthlyAmount) * (1+r);
+  const gainsLastYear = (port - invested) - (portPrev - nPrev*monthlyAmount);
+
+  return {
+    portfolio: port,
+    invested,
+    gains: port - invested,
+    roi: invested > 0 ? (port-invested)/invested*100 : 0,
+    gainsLastYear,
+  };
+}
+
+// ═══════════════════════════════════════════════════
+// MINI CHART (simulation tab)
+// ═══════════════════════════════════════════════════
+function drawMiniChart(canvasId, points, color, yUnit) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width  = rect.width  * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width  = rect.width  + 'px';
+  canvas.style.height = rect.height + 'px';
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  const pad = { top:16, right:16, bottom:28, left:52 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top  - pad.bottom;
+  ctx.clearRect(0,0,W,H);
+
+  const sorted = [...points].sort((a,b) => a.x-b.x);
+  const ys = points.map(p=>p.y);
+  let yMin = Math.min(...ys)*0.85, yMax = Math.max(...ys)*1.15||1;
+  if (yMin===yMax){yMin-=1;yMax+=1;}
+
+  // Grid lines + Y labels
+  ctx.strokeStyle='#1f2535'; ctx.lineWidth=1;
+  for (let i=0;i<=4;i++) {
+    const gy = pad.top+(ch/4)*i;
+    ctx.beginPath(); ctx.moveTo(pad.left,gy); ctx.lineTo(pad.left+cw,gy); ctx.stroke();
+    const val = yMax-(yMax-yMin)*(i/4);
+    ctx.fillStyle='#606880'; ctx.font='10px DM Mono'; ctx.textAlign='right';
+    ctx.fillText(yUnit==='%' ? val.toFixed(1)+'%' : Math.round(val)+'€', pad.left-6, gy+3.5);
+  }
+
+  // X labels
+  const totalYears = state.years;
+  const step = totalYears<=10?1:Math.ceil(totalYears/10);
+  for (let yr=0; yr<=totalYears; yr+=step) {
+    const gx = pad.left+(yr/totalYears)*cw;
+    ctx.fillStyle='#606880'; ctx.font='10px DM Mono'; ctx.textAlign='center';
+    ctx.fillText(yr, gx, H-8);
+  }
+  if (totalYears % step !== 0) {
+    ctx.fillStyle='#606880'; ctx.font='10px DM Mono'; ctx.textAlign='center';
+    ctx.fillText(totalYears, pad.left+cw, H-8);
+  }
+
+  // Gradient fill + line
+  const steps=200;
+  const grad = ctx.createLinearGradient(0,pad.top,0,pad.top+ch);
+  grad.addColorStop(0, color+'44'); grad.addColorStop(1, color+'00');
+
+  const pathPts = [];
+  for (let i=0;i<=steps;i++) {
+    const xv=(i/steps)*totalYears, yv=lerp(sorted,xv);
+    pathPts.push([pad.left+(xv/totalYears)*cw, pad.top+(1-(yv-yMin)/(yMax-yMin))*ch]);
+  }
+
+  ctx.beginPath();
+  pathPts.forEach(([px,py],i) => i===0?ctx.moveTo(px,py):ctx.lineTo(px,py));
+  ctx.lineTo(pad.left+cw,pad.top+ch); ctx.lineTo(pad.left,pad.top+ch);
+  ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+
+  ctx.beginPath();
+  pathPts.forEach(([px,py],i) => i===0?ctx.moveTo(px,py):ctx.lineTo(px,py));
+  ctx.strokeStyle=color; ctx.lineWidth=2; ctx.stroke();
+
+  // Draggable points
+  sorted.forEach(pt => {
+    const px=pad.left+(pt.x/totalYears)*cw;
+    const py=pad.top+(1-(pt.y-yMin)/(yMax-yMin))*ch;
+    ctx.beginPath(); ctx.arc(px,py,5,0,Math.PI*2);
+    ctx.fillStyle=color; ctx.fill();
+    ctx.strokeStyle='#0b0d11'; ctx.lineWidth=2; ctx.stroke();
+  });
+}
+
+function drawBoth() {
+  drawMiniChart('amountCanvas', state.amountPoints, '#e8c97e', '€');
+  drawMiniChart('rateCanvas',   state.ratePoints,   '#5fb3a8', '%');
+}
+
+// ═══════════════════════════════════════════════════
+// SIMULATION TABLE
+// ═══════════════════════════════════════════════════
+function renderTable(type) {
+  const pts  = type==='amount' ? state.amountPoints : state.ratePoints;
+  const tbId = type==='amount' ? 'amountTable' : 'rateTable';
+  const tb   = document.querySelector(`#${tbId} tbody`);
+  tb.innerHTML='';
+  [...pts].sort((a,b)=>a.x-b.x).forEach(pt => {
+    const idx=pts.indexOf(pt), canDel=pts.length>1;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><input type="number" value="${pt.x.toFixed(1)}" min="0" max="${state.years}" step="0.5" style="width:70px"
+        onchange="updatePointX('${type}',${idx},this.value)"></td>
+      <td><input type="number" value="${pt.y}"
+        min="${type==='amount'?0:-20}" max="${type==='amount'?100000:50}"
+        step="${type==='amount'?50:0.1}"
+        onchange="updatePointY('${type}',${idx},this.value)"></td>
+      <td>${canDel?`<button class="del-btn" onclick="deletePoint('${type}',${idx})">✕</button>`:'<span style="color:var(--border)">—</span>'}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function renderBothTables() { renderTable('amount'); renderTable('rate'); }
+
+function addPoint(type) {
+  const pts=type==='amount'?state.amountPoints:state.ratePoints;
+  const maxX=Math.max(...pts.map(p=>p.x));
+  const newX=Math.min(maxX+state.years/(pts.length+1), state.years);
+  pts.push({x:parseFloat(newX.toFixed(1)), y:pts[pts.length-1].y});
+  refresh();
+}
+
+function deletePoint(type,idx) {
+  const pts=type==='amount'?state.amountPoints:state.ratePoints;
+  if(pts.length<=1) return;
+  pts.splice(idx,1); refresh();
+}
+
+function updatePointX(type,idx,val) {
+  const pts=type==='amount'?state.amountPoints:state.ratePoints;
+  pts[idx].x=clamp(parseFloat(val)||0,0,state.years); refresh();
+}
+
+function updatePointY(type,idx,val) {
+  const pts=type==='amount'?state.amountPoints:state.ratePoints;
+  pts[idx].y=parseFloat(val)||0; refresh();
+}
+
+// ═══════════════════════════════════════════════════
+// CHART CLICK + DRAG
+// ═══════════════════════════════════════════════════
+function setupChartClick(zoneId, canvasId, type) {
+  const zone=document.getElementById(zoneId);
+
+  const getCoords=(e)=>{
+    const rect=document.getElementById(canvasId).getBoundingClientRect();
+    const pad={top:16,right:16,bottom:28,left:52};
+    const cw=rect.width-pad.left-pad.right, ch=rect.height-pad.top-pad.bottom;
+    const pts=type==='amount'?state.amountPoints:state.ratePoints;
+    const ys=pts.map(p=>p.y);
+    let yMin=Math.min(...ys)*0.85, yMax=Math.max(...ys)*1.15||1;
+    if(yMin===yMax){yMin-=1;yMax+=1;}
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    return {mx,my,pad,cw,ch,yMin,yMax,rect};
+  };
+
+  zone.addEventListener('click', (e)=>{
+    const {mx,my,pad,cw,ch,yMin,yMax}=getCoords(e);
+    if(mx<pad.left||mx>pad.left+cw||my<pad.top||my>pad.top+ch) return;
+    const pts=type==='amount'?state.amountPoints:state.ratePoints;
+    const xv=((mx-pad.left)/cw)*state.years;
+    const yv=yMax-((my-pad.top)/ch)*(yMax-yMin);
+    if(!pts.find(p=>Math.abs(p.x-xv)<state.years*0.05)){
+      pts.push({x:parseFloat(xv.toFixed(1)),y:parseFloat(yv.toFixed(type==='amount'?0:2))});
+      refresh();
+    }
+  });
+
+  let dragging=null;
+  zone.addEventListener('mousedown',(e)=>{
+    const {mx,my,pad,cw,ch,yMin,yMax}=getCoords(e);
+    const pts=type==='amount'?state.amountPoints:state.ratePoints;
+    pts.forEach((pt,idx)=>{
+      const px=pad.left+(pt.x/state.years)*cw;
+      const py=pad.top+(1-(pt.y-yMin)/(yMax-yMin))*ch;
+      if(Math.hypot(mx-px,my-py)<10){dragging={idx,type};e.preventDefault();}
+    });
+  });
+
+  window.addEventListener('mousemove',(e)=>{
+    if(!dragging||dragging.type!==type) return;
+    const {pad,cw,ch,yMin,yMax,rect}=getCoords(e);
+    const pts=type==='amount'?state.amountPoints:state.ratePoints;
+    const mx=clamp(e.clientX-rect.left,pad.left,pad.left+cw);
+    const my=clamp(e.clientY-rect.top,pad.top,pad.top+ch);
+    pts[dragging.idx].x=parseFloat(clamp((mx-pad.left)/cw*state.years,0,state.years).toFixed(1));
+    pts[dragging.idx].y=parseFloat((yMax-((my-pad.top)/ch)*(yMax-yMin)).toFixed(type==='amount'?0:2));
+    refresh();
+  });
+
+  window.addEventListener('mouseup',()=>{ dragging=null; });
+}
+
+// ═══════════════════════════════════════════════════
+// FULL SIMULATION
+// ═══════════════════════════════════════════════════
+function simulate() {
+  const months=state.years*12;
+  let portfolio=0, totalInvested=0;
+  const monthly=[];
+  for(let m=0;m<months;m++){
+    const yearFrac=m/12;
+    const monthlyAmount=lerp(state.amountPoints,yearFrac);
+    const annualRate=lerp(state.ratePoints,yearFrac)/100;
+    const monthlyRate=Math.pow(1+annualRate,1/12)-1;
+    portfolio=(portfolio+monthlyAmount)*(1+monthlyRate);
+    totalInvested+=monthlyAmount;
+    monthly.push({m,yearFrac,portfolio,totalInvested,gains:portfolio-totalInvested});
+  }
+  return monthly;
+}
+
+function buildAnnualSummary(monthly) {
+  return Array.from({length:state.years},(_,i)=>{
+    const y=i+1;
+    const mEnd=monthly[y*12-1];
+    const mStart=y>1?monthly[(y-1)*12-1]:{totalInvested:0,gains:0};
+    return {
+      year:y,
+      deposit:mEnd.totalInvested-mStart.totalInvested,
+      yearlyGains:mEnd.gains-mStart.gains,
+      rate:lerp(state.ratePoints,y-0.5),
+      invested:mEnd.totalInvested,
+      gains:mEnd.gains,
+      total:mEnd.portfolio,
+    };
+  });
+}
+
+function drawResultChart(annual) {
+  if(resultChart) resultChart.destroy();
+  const ctx=document.getElementById('resultCanvas').getContext('2d');
+  const labels=annual.map(r=>`An ${r.year}`);
+  const ttipStyle={
+    backgroundColor:'#12151c',borderColor:'#252b3a',borderWidth:1,
+    titleColor:'#d4d8e4',bodyColor:'#606880',
+    titleFont:{family:'DM Mono',size:11},bodyFont:{family:'DM Mono',size:11},
+    callbacks:{label:c=>` ${c.dataset.label}: ${new Intl.NumberFormat('fr-FR').format(c.raw)} €`},
+  };
+  resultChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Capital investi (cumulé)',data:annual.map(r=>Math.round(r.invested)),backgroundColor:'#e8c97e33',borderColor:'#e8c97e',borderWidth:1,borderRadius:2,stack:'s',yAxisID:'y'},
+      {label:'Gains générés (cumulés)',data:annual.map(r=>Math.round(r.gains)),backgroundColor:'#6dcf9e33',borderColor:'#6dcf9e',borderWidth:1,borderRadius:2,stack:'s',yAxisID:'y'},
+      {label:'Gains générés (année)',data:annual.map(r=>Math.round(r.yearlyGains)),type:'line',yAxisID:'y2',borderColor:'#c47bbd',backgroundColor:'#c47bbd22',borderWidth:2,pointBackgroundColor:'#c47bbd',pointBorderColor:'#0b0d11',pointBorderWidth:2,pointRadius:4,pointHoverRadius:6,fill:true,tension:0.35,order:0},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:400},interaction:{mode:'index'},
+      plugins:{
+        legend:{labels:{color:'#606880',font:{family:'DM Mono',size:11},boxWidth:12,padding:16}},
+        tooltip:ttipStyle,
+      },
+      scales:{
+        x:{stacked:true,ticks:{color:'#606880',font:{family:'DM Mono',size:10}},grid:{color:'#1a1f2b'},border:{color:'#252b3a'}},
+        y:{stacked:true,position:'left',ticks:{color:'#606880',font:{family:'DM Mono',size:10},callback:v=>fmtK(v)},grid:{color:'#1a1f2b'},border:{color:'#252b3a'}},
+        y2:{position:'right',beginAtZero:true,ticks:{color:'#c47bbd',font:{family:'DM Mono',size:10},callback:v=>fmtK(v)},grid:{drawOnChartArea:false},border:{color:'#c47bbd44'}},
+      },
+    },
+  });
+}
+
+function renderResults() {
+  const monthly=simulate();
+  const last=monthly[monthly.length-1];
+  const annual=buildAnnualSummary(monthly);
+  document.getElementById('sumInvested').textContent=fmt(last.totalInvested);
+  document.getElementById('sumGains').textContent=fmt(last.gains);
+  document.getElementById('sumTotal').textContent=fmt(last.portfolio);
+  document.getElementById('sumROI').textContent=fmtPct(last.totalInvested>0?(last.gains/last.totalInvested)*100:0);
+  document.getElementById('sumRate').textContent=fmtPct(monthly.reduce((s,m)=>s+lerp(state.ratePoints,m.yearFrac),0)/monthly.length);
+  drawResultChart(annual);
+  const tb=document.getElementById('annualBody');
+  tb.innerHTML='';
+  annual.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>Année ${r.year}</td><td>${fmt(r.deposit)}</td><td>${fmtPct(r.rate)}</td><td class="total">${fmt(r.invested)}</td><td class="gain">${fmt(r.yearlyGains)}</td><td class="gain">${fmt(r.gains)}</td><td class="total">${fmt(r.total)}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function adjustYears(delta) {
+  const inp=document.getElementById('yearsInput');
+  const v=clamp((parseInt(inp.value)||10)+delta,1,50);
+  inp.value=v; state.years=v;
+  state.amountPoints.forEach(p=>{p.x=clamp(p.x,0,v);});
+  state.ratePoints.forEach(p=>{p.x=clamp(p.x,0,v);});
+  refresh();
+}
+
+document.getElementById('yearsInput').addEventListener('change',e=>{
+  state.years=clamp(parseInt(e.target.value)||10,1,50);
+  state.amountPoints.forEach(p=>{p.x=clamp(p.x,0,state.years);});
+  state.ratePoints.forEach(p=>{p.x=clamp(p.x,0,state.years);});
+  refresh();
+});
+
+function refresh() { drawBoth(); renderBothTables(); renderResults(); }
+
+// ═══════════════════════════════════════════════════
+// REFERENCE CHARTS
+// ═══════════════════════════════════════════════════
+const CURVE_RATES  = [2, 5, 7, 10];
+const CURVE_COLORS = ['#5fb3a8','#e8c97e','#c47bbd','#e07070'];
+
+const refCharts = {};
+function destroyRef(id) { if(refCharts[id]){refCharts[id].destroy();delete refCharts[id];} }
+
+const baseScales = (xLabel, yCb) => ({
+  x:{
+    title:{display:!!xLabel,text:xLabel,color:'#50586a',font:{family:'DM Mono',size:10}},
+    ticks:{color:'#606880',font:{family:'DM Mono',size:10}},
+    grid:{color:'#1a1f2b'},border:{color:'#252b3a'},
+  },
+  y:{
+    ticks:{color:'#606880',font:{family:'DM Mono',size:10},callback:yCb||(v=>fmtK(v))},
+    grid:{color:'#1a1f2b'},border:{color:'#252b3a'},
+  },
+});
+
+const basePlugin = (labelCb) => ({
+  legend:{labels:{color:'#606880',font:{family:'DM Mono',size:10},boxWidth:10,padding:10}},
+  tooltip:{
+    backgroundColor:'#12151c',borderColor:'#252b3a',borderWidth:1,
+    titleColor:'#d4d8e4',bodyColor:'#606880',
+    titleFont:{family:'DM Mono',size:11},bodyFont:{family:'DM Mono',size:11},
+    callbacks:{label:labelCb||(c=>` ${c.dataset.label}: ${fmtK(c.raw)}`)},
+  },
+});
+
+// Chart 1: ROI% vs taux (0–10%), durée choisie, 500€/mois
+function drawRefChart1(years) {
+  destroyRef('c1');
+  const ctx=document.getElementById('refChart1').getContext('2d');
+  const labels=[], data=[];
+  for(let ri=0;ri<=100;ri++){
+    const rate=ri/10;
+    labels.push(rate%1===0?rate+'%':'');
+    data.push(parseFloat(simulateFixed(500,rate,years).roi.toFixed(2)));
+  }
+  // Custom labels: show every 1%
+  const displayLabels = Array.from({length:101},(_,i)=> i%10===0 ? (i/10)+'%' : '');
+
+  refCharts['c1']=new Chart(ctx,{
+    type:'line',
+    data:{labels:displayLabels,datasets:[{
+      label:`ROI sur ${years} ans (500 €/mois)`,
+      data,
+      borderColor:'#e8c97e',backgroundColor:'#e8c97e18',
+      borderWidth:2,pointRadius:0,fill:true,tension:0.3,
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:300},
+      interaction:{mode:'index'},
+      plugins:basePlugin(c=>` ROI : ${c.raw.toFixed(1)} %`),
+      scales:baseScales('Taux annuel', v=>v.toFixed(0)+' %'),
+    },
+  });
+}
+
+// Chart 2: Valeur finale vs durée (1–30 ans), 500€/mois, 4 taux
+function drawRefChart2() {
+  destroyRef('c2');
+  const ctx=document.getElementById('refChart2').getContext('2d');
+  const labels=Array.from({length:30},(_,i)=>`${i+1} an${i>0?'s':''}`);
+  const datasets=CURVE_RATES.map((rate,i)=>({
+    label:rate+'%/an',
+    data:Array.from({length:30},(_,y)=>Math.round(simulateFixed(500,rate,y+1).portfolio)),
+    borderColor:CURVE_COLORS[i],backgroundColor:CURVE_COLORS[i]+'15',
+    borderWidth:2,pointRadius:0,fill:false,tension:0.3,
+  }));
+  refCharts['c2']=new Chart(ctx,{
+    type:'line',data:{labels,datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:300},interaction:{mode:'index'},
+      plugins:basePlugin(),scales:baseScales('Durée'),
+    },
+  });
+}
+
+// Chart 3: Gains cumulés vs versement mensuel (0–max), durée, 4 taux
+function drawRefChart3(years, maxAmount) {
+  destroyRef('c3');
+  const ctx=document.getElementById('refChart3').getContext('2d');
+  const N=25;
+  const labels=Array.from({length:N+1},(_,i)=>i%5===0?Math.round(maxAmount*i/N)+' €':'');
+  const datasets=CURVE_RATES.map((rate,i)=>({
+    label:rate+'%/an',
+    data:Array.from({length:N+1},(_,j)=>Math.round(simulateFixed(maxAmount*j/N,rate,years).gains)),
+    borderColor:CURVE_COLORS[i],backgroundColor:CURVE_COLORS[i]+'15',
+    borderWidth:2,pointRadius:0,fill:false,tension:0.3,
+  }));
+  refCharts['c3']=new Chart(ctx,{
+    type:'line',data:{labels,datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:300},interaction:{mode:'index'},
+      plugins:basePlugin(),scales:baseScales('Versement mensuel'),
+    },
+  });
+}
+
+// Chart 4: Gains dernière année vs versement mensuel
+function drawRefChart4(years, maxAmount) {
+  destroyRef('c4');
+  const ctx=document.getElementById('refChart4').getContext('2d');
+  const N=25;
+  const labels=Array.from({length:N+1},(_,i)=>i%5===0?Math.round(maxAmount*i/N)+' €':'');
+  const datasets=CURVE_RATES.map((rate,i)=>({
+    label:rate+'%/an',
+    data:Array.from({length:N+1},(_,j)=>{
+      const m=maxAmount*j/N;
+      return years>=1 ? Math.round(simulateFixed(m,rate,years).gainsLastYear) : 0;
+    }),
+    borderColor:CURVE_COLORS[i],backgroundColor:CURVE_COLORS[i]+'15',
+    borderWidth:2,pointRadius:0,fill:false,tension:0.3,
+  }));
+  refCharts['c4']=new Chart(ctx,{
+    type:'line',data:{labels,datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:300},interaction:{mode:'index'},
+      plugins:basePlugin(),scales:baseScales('Versement mensuel'),
+    },
+  });
+}
+
+function drawAllRefCharts() {
+  const years=parseInt(document.getElementById('refYears').value)||10;
+  const maxAmount=parseInt(document.getElementById('refMaxAmount').value)||2000;
+  drawRefChart1(years);
+  drawRefChart2();
+  drawRefChart3(years, maxAmount);
+  drawRefChart4(years, maxAmount);
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+setupChartClick('amountChartZone','amountCanvas','amount');
+setupChartClick('rateChartZone','rateCanvas','rate');
+
+const ro=new ResizeObserver(()=>drawBoth());
+ro.observe(document.getElementById('amountChartZone'));
+ro.observe(document.getElementById('rateChartZone'));
+
+refresh();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('[PWA] SW:', r.scope))
+      .catch(e => console.warn('[PWA] SW error:', e));
+  });
+}
+</script>
+</body>
+</html>
