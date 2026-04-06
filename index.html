@@ -1116,7 +1116,7 @@ function drawRefChart1(years) {
   });
 }
 
-// Chart 2: Valeur finale vs durée (1–30 ans), versement max, 4 taux — log Y
+// Chart 2: Valeur finale vs durée (1–30 ans), versement max, 4 taux
 function drawRefChart2(maxAmount) {
   destroyRef('c2');
   const ctx=document.getElementById('refChart2').getContext('2d');
@@ -1125,21 +1125,13 @@ function drawRefChart2(maxAmount) {
     label:rate+'%/an',
     data:Array.from({length:30},(_,y)=>Math.round(simulateFixed(maxAmount,rate,y+1).portfolio)),
     borderColor:CURVE_COLORS[i],backgroundColor:CURVE_COLORS[i]+'15',
-    borderWidth:2,pointRadius:0,fill:false,tension:0.3,
+    borderWidth:2,pointRadius:0,pointHoverRadius:5,pointHoverBackgroundColor:CURVE_COLORS[i],fill:false,tension:0.3,
   }));
   refCharts['c2']=new Chart(ctx,{
     type:'line',data:{labels,datasets},
     options:{
       responsive:true,maintainAspectRatio:false,animation:{duration:300},interaction:{mode:'index'},
-      plugins:basePlugin(),
-      scales:{
-        x: baseScales('Durée').x,
-        y:{
-          type:'logarithmic',
-          ticks:{color:'#606880',font:{family:'DM Mono',size:10},callback:v=>fmtK(v)},
-          grid:{color:'#1a1f2b'},border:{color:'#252b3a'},
-        },
-      },
+      plugins:basePlugin(),scales:baseScales('Durée'),
     },
   });
 }
@@ -1155,7 +1147,10 @@ function drawRefChart3(years, maxAmount) {
     label:rate+'%/an',
     data:AMOUNTS.map(m=>Math.round(simulateFixed(m,rate,years).gains)),
     borderColor:CURVE_COLORS[i],backgroundColor:CURVE_COLORS[i]+'15',
-    borderWidth:2,pointRadius:3,pointBackgroundColor:CURVE_COLORS[i],fill:false,tension:0.3,
+    borderWidth:2,
+    pointRadius:4,pointBackgroundColor:CURVE_COLORS[i],pointBorderColor:'#0b0d11',pointBorderWidth:2,
+    pointHoverRadius:6,pointHoverBackgroundColor:CURVE_COLORS[i],pointHoverBorderColor:'#fff',pointHoverBorderWidth:2,
+    fill:false,tension:0.3,
   }));
   refCharts['c3']=new Chart(ctx,{
     type:'line',data:{labels,datasets},
@@ -1166,7 +1161,7 @@ function drawRefChart3(years, maxAmount) {
   });
 }
 
-// Chart 4: Gains dernière année vs versement mensuel — log Y
+// Chart 4: Gains dernière année vs versement mensuel
 function drawRefChart4(years, maxAmount) {
   destroyRef('c4');
   const ctx=document.getElementById('refChart4').getContext('2d');
@@ -1175,23 +1170,18 @@ function drawRefChart4(years, maxAmount) {
   const labels=AMOUNTS.map(a=>a+' €');
   const datasets=CURVE_RATES.map((rate,i)=>({
     label:rate+'%/an',
-    data:AMOUNTS.map(m=> years>=1 ? Math.max(1,Math.round(simulateFixed(m,rate,years).gainsLastYear)) : 1),
+    data:AMOUNTS.map(m=> years>=1 ? Math.round(simulateFixed(m,rate,years).gainsLastYear) : 0),
     borderColor:CURVE_COLORS[i],backgroundColor:CURVE_COLORS[i]+'15',
-    borderWidth:2,pointRadius:3,pointBackgroundColor:CURVE_COLORS[i],fill:false,tension:0.3,
+    borderWidth:2,
+    pointRadius:4,pointBackgroundColor:CURVE_COLORS[i],pointBorderColor:'#0b0d11',pointBorderWidth:2,
+    pointHoverRadius:6,pointHoverBackgroundColor:CURVE_COLORS[i],pointHoverBorderColor:'#fff',pointHoverBorderWidth:2,
+    fill:false,tension:0.3,
   }));
   refCharts['c4']=new Chart(ctx,{
     type:'line',data:{labels,datasets},
     options:{
       responsive:true,maintainAspectRatio:false,animation:{duration:300},interaction:{mode:'index'},
-      plugins:basePlugin(),
-      scales:{
-        x: baseScales('Versement mensuel').x,
-        y:{
-          type:'logarithmic',
-          ticks:{color:'#606880',font:{family:'DM Mono',size:10},callback:v=>fmtK(v)},
-          grid:{color:'#1a1f2b'},border:{color:'#252b3a'},
-        },
-      },
+      plugins:basePlugin(),scales:baseScales('Versement mensuel'),
     },
   });
 }
