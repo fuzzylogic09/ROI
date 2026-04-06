@@ -445,8 +445,8 @@
   .ref-select:focus { border-color: var(--accent); }
 
   .ref-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 16px;
   }
 
@@ -644,10 +644,16 @@
     <div>
       <label>Versement max</label>
       <select class="ref-select" id="refMaxAmount" onchange="drawAllRefCharts()">
+        <option value="50">50 €/mois</option>
+        <option value="100">100 €/mois</option>
+        <option value="200">200 €/mois</option>
+        <option value="300">300 €/mois</option>
+        <option value="400">400 €/mois</option>
         <option value="500">500 €/mois</option>
+        <option value="750">750 €/mois</option>
         <option value="1000">1 000 €/mois</option>
+        <option value="1500">1 500 €/mois</option>
         <option value="2000" selected>2 000 €/mois</option>
-        <option value="5000">5 000 €/mois</option>
       </select>
     </div>
   </div>
@@ -657,7 +663,7 @@
     <div class="ref-panel">
       <div class="ref-panel-title">ROI final vs. taux annuel</div>
       <div class="ref-panel-desc">
-        Rendement total (%) obtenu sur la période choisie, pour 500 €/mois versés à taux fixe. Illustre la non-linéarité de l'effet des intérêts composés.
+        Rendement total (%) obtenu sur la durée choisie, à taux fixe. Illustre la non-linéarité de l'effet des intérêts composés — indépendant du montant versé.
       </div>
       <div class="ref-chart-wrap"><canvas id="refChart1"></canvas></div>
     </div>
@@ -665,7 +671,7 @@
     <div class="ref-panel">
       <div class="ref-panel-title">Valeur finale vs. durée d'investissement</div>
       <div class="ref-panel-desc">
-        Valeur du portefeuille à l'échéance selon la durée (1–30 ans), pour 500 €/mois à différents taux. Montre l'accélération exponentielle en fin de période.
+        Valeur du portefeuille à l'échéance selon la durée (1–30 ans), pour le versement mensuel max défini ci-dessus, à différents taux. Échelle logarithmique pour mieux distinguer les courbes en début de période.
       </div>
       <div class="ref-chart-wrap"><canvas id="refChart2"></canvas></div>
     </div>
@@ -673,7 +679,7 @@
     <div class="ref-panel">
       <div class="ref-panel-title">Gains cumulés vs. versement mensuel</div>
       <div class="ref-panel-desc">
-        Intérêts totaux générés sur la période selon le montant versé chaque mois, à différents taux. La pente s'accentue avec le taux.
+        Intérêts totaux générés sur la durée choisie, de 0 jusqu'au versement max défini ci-dessus, à différents taux.
       </div>
       <div class="ref-chart-wrap"><canvas id="refChart3"></canvas></div>
     </div>
@@ -681,7 +687,7 @@
     <div class="ref-panel">
       <div class="ref-panel-title">Gains de la dernière année vs. versement mensuel</div>
       <div class="ref-panel-desc">
-        Intérêts générés uniquement sur la dernière année de la période. Illustre l'effet boule de neige : à taux élevé et longue durée, la dernière année rapporte autant que les premières années entières.
+        Intérêts générés uniquement sur la dernière année, de 0 jusqu'au versement max défini ci-dessus. Échelle logarithmique. Illustre l'effet boule de neige : à taux élevé et longue durée, la dernière année peut rapporter autant que les premières années entières.
       </div>
       <div class="ref-chart-wrap"><canvas id="refChart4"></canvas></div>
     </div>
@@ -1087,23 +1093,16 @@ const basePlugin = (labelCb) => ({
   },
 });
 
-// Chart 1: ROI% vs taux (0–10%), durée choisie, 500€/mois
+// Chart 1: ROI% vs taux (0–10%), durée choisie — indépendant du montant
 function drawRefChart1(years) {
   destroyRef('c1');
   const ctx=document.getElementById('refChart1').getContext('2d');
-  const labels=[], data=[];
-  for(let ri=0;ri<=100;ri++){
-    const rate=ri/10;
-    labels.push(rate%1===0?rate+'%':'');
-    data.push(parseFloat(simulateFixed(500,rate,years).roi.toFixed(2)));
-  }
-  // Custom labels: show every 1%
   const displayLabels = Array.from({length:101},(_,i)=> i%10===0 ? (i/10)+'%' : '');
-
+  const data = Array.from({length:101},(_,ri)=>parseFloat(simulateFixed(500,ri/10,years).roi.toFixed(2)));
   refCharts['c1']=new Chart(ctx,{
     type:'line',
     data:{labels:displayLabels,datasets:[{
-      label:`ROI sur ${years} ans (500 €/mois)`,
+      label:`ROI sur ${years} ans`,
       data,
       borderColor:'#e8c97e',backgroundColor:'#e8c97e18',
       borderWidth:2,pointRadius:0,fill:true,tension:0.3,
@@ -1117,14 +1116,14 @@ function drawRefChart1(years) {
   });
 }
 
-// Chart 2: Valeur finale vs durée (1–30 ans), 500€/mois, 4 taux
-function drawRefChart2() {
+// Chart 2: Valeur finale vs durée (1–30 ans), versement max, 4 taux — log Y
+function drawRefChart2(maxAmount) {
   destroyRef('c2');
   const ctx=document.getElementById('refChart2').getContext('2d');
   const labels=Array.from({length:30},(_,i)=>`${i+1} an${i>0?'s':''}`);
   const datasets=CURVE_RATES.map((rate,i)=>({
     label:rate+'%/an',
-    data:Array.from({length:30},(_,y)=>Math.round(simulateFixed(500,rate,y+1).portfolio)),
+    data:Array.from({length:30},(_,y)=>Math.round(simulateFixed(maxAmount,rate,y+1).portfolio)),
     borderColor:CURVE_COLORS[i],backgroundColor:CURVE_COLORS[i]+'15',
     borderWidth:2,pointRadius:0,fill:false,tension:0.3,
   }));
@@ -1132,7 +1131,15 @@ function drawRefChart2() {
     type:'line',data:{labels,datasets},
     options:{
       responsive:true,maintainAspectRatio:false,animation:{duration:300},interaction:{mode:'index'},
-      plugins:basePlugin(),scales:baseScales('Durée'),
+      plugins:basePlugin(),
+      scales:{
+        x: baseScales('Durée').x,
+        y:{
+          type:'logarithmic',
+          ticks:{color:'#606880',font:{family:'DM Mono',size:10},callback:v=>fmtK(v)},
+          grid:{color:'#1a1f2b'},border:{color:'#252b3a'},
+        },
+      },
     },
   });
 }
@@ -1141,13 +1148,14 @@ function drawRefChart2() {
 function drawRefChart3(years, maxAmount) {
   destroyRef('c3');
   const ctx=document.getElementById('refChart3').getContext('2d');
-  const N=25;
-  const labels=Array.from({length:N+1},(_,i)=>i%5===0?Math.round(maxAmount*i/N)+' €':'');
+  const AMOUNTS=[50,100,200,300,400,500,750,1000,1500,2000].filter(a=>a<=maxAmount);
+  if (!AMOUNTS.includes(maxAmount)) AMOUNTS.push(maxAmount);
+  const labels=AMOUNTS.map(a=>a+' €');
   const datasets=CURVE_RATES.map((rate,i)=>({
     label:rate+'%/an',
-    data:Array.from({length:N+1},(_,j)=>Math.round(simulateFixed(maxAmount*j/N,rate,years).gains)),
+    data:AMOUNTS.map(m=>Math.round(simulateFixed(m,rate,years).gains)),
     borderColor:CURVE_COLORS[i],backgroundColor:CURVE_COLORS[i]+'15',
-    borderWidth:2,pointRadius:0,fill:false,tension:0.3,
+    borderWidth:2,pointRadius:3,pointBackgroundColor:CURVE_COLORS[i],fill:false,tension:0.3,
   }));
   refCharts['c3']=new Chart(ctx,{
     type:'line',data:{labels,datasets},
@@ -1158,26 +1166,32 @@ function drawRefChart3(years, maxAmount) {
   });
 }
 
-// Chart 4: Gains dernière année vs versement mensuel
+// Chart 4: Gains dernière année vs versement mensuel — log Y
 function drawRefChart4(years, maxAmount) {
   destroyRef('c4');
   const ctx=document.getElementById('refChart4').getContext('2d');
-  const N=25;
-  const labels=Array.from({length:N+1},(_,i)=>i%5===0?Math.round(maxAmount*i/N)+' €':'');
+  const AMOUNTS=[50,100,200,300,400,500,750,1000,1500,2000].filter(a=>a<=maxAmount);
+  if (!AMOUNTS.includes(maxAmount)) AMOUNTS.push(maxAmount);
+  const labels=AMOUNTS.map(a=>a+' €');
   const datasets=CURVE_RATES.map((rate,i)=>({
     label:rate+'%/an',
-    data:Array.from({length:N+1},(_,j)=>{
-      const m=maxAmount*j/N;
-      return years>=1 ? Math.round(simulateFixed(m,rate,years).gainsLastYear) : 0;
-    }),
+    data:AMOUNTS.map(m=> years>=1 ? Math.max(1,Math.round(simulateFixed(m,rate,years).gainsLastYear)) : 1),
     borderColor:CURVE_COLORS[i],backgroundColor:CURVE_COLORS[i]+'15',
-    borderWidth:2,pointRadius:0,fill:false,tension:0.3,
+    borderWidth:2,pointRadius:3,pointBackgroundColor:CURVE_COLORS[i],fill:false,tension:0.3,
   }));
   refCharts['c4']=new Chart(ctx,{
     type:'line',data:{labels,datasets},
     options:{
       responsive:true,maintainAspectRatio:false,animation:{duration:300},interaction:{mode:'index'},
-      plugins:basePlugin(),scales:baseScales('Versement mensuel'),
+      plugins:basePlugin(),
+      scales:{
+        x: baseScales('Versement mensuel').x,
+        y:{
+          type:'logarithmic',
+          ticks:{color:'#606880',font:{family:'DM Mono',size:10},callback:v=>fmtK(v)},
+          grid:{color:'#1a1f2b'},border:{color:'#252b3a'},
+        },
+      },
     },
   });
 }
@@ -1186,7 +1200,7 @@ function drawAllRefCharts() {
   const years=parseInt(document.getElementById('refYears').value)||10;
   const maxAmount=parseInt(document.getElementById('refMaxAmount').value)||2000;
   drawRefChart1(years);
-  drawRefChart2();
+  drawRefChart2(maxAmount);
   drawRefChart3(years, maxAmount);
   drawRefChart4(years, maxAmount);
 }
